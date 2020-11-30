@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "584230879351",
+    "firebase_url": "https://uberbykotlin.firebaseio.com",
+    "project_id": "uberbykotlin",
+    "storage_bucket": "uberbykotlin.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:584230879351:android:4256a8ec8cfbd6440e4672",
+        "android_client_info": {
+          "package_name": "com.example.uberbykotlin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "584230879351-ibm0du9su8mni86ppbr16nm48jnsa1f2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-q_y-02Hlrif-j1i4c2BYVUoqDfJsukE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "584230879351-ibm0du9su8mni86ppbr16nm48jnsa1f2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
