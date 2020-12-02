@@ -36,7 +36,7 @@ class SplashScreenActivity : AppCompatActivity() {
     private lateinit var firebaseAuth: FirebaseAuth
     private lateinit var listener: FirebaseAuth.AuthStateListener
     private lateinit var database: FirebaseDatabase
-    private lateinit var driverInfoReference: DatabaseReference
+    private lateinit var driverInfoRef: DatabaseReference
 
     override fun onStart() {
         super.onStart()
@@ -65,40 +65,38 @@ class SplashScreenActivity : AppCompatActivity() {
     }
 
     private fun init() {
+        firebaseAuth = FirebaseAuth.getInstance()
         database = FirebaseDatabase.getInstance()
-        driverInfoReference = database.getReference(Common.DRIVER_INFO_REFERENCE)
+        driverInfoRef = database.getReference(Common.DRIVER_INFO_REFERENCE)
 
         this.providers = Arrays.asList(
             AuthUI.IdpConfig.PhoneBuilder().build(),
             AuthUI.IdpConfig.GoogleBuilder().build()
         )
 
-        firebaseAuth = FirebaseAuth.getInstance()
         listener = FirebaseAuth.AuthStateListener {
             val user = it.currentUser
             if (user != null){
                 checkUserFromFirebase()
             }
-            else
+            else {
                 showLoginLayout()
-
+            }
         }
     }
 
     private fun checkUserFromFirebase() {
-        driverInfoReference
-            .child(firebaseAuth.currentUser!!.uid)
+        driverInfoRef
+            .child(FirebaseAuth.getInstance().currentUser!!.uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     if (snapshot.exists()) {
                         Toast.makeText(applicationContext, "User already registered!", Toast.LENGTH_SHORT).show()
                     }
                 }
-
                 override fun onCancelled(error: DatabaseError) {
                     showRegisterLayput()
                 }
-
             })
     }
 
@@ -113,9 +111,10 @@ class SplashScreenActivity : AppCompatActivity() {
         val btnContinue = itemView.findViewById<View>(R.id.btnRegister)
 
         //Set data
-        if(firebaseAuth.currentUser!!.phoneNumber != null &&
-                !TextUtils.isDigitsOnly(firebaseAuth.currentUser!!.phoneNumber))
-                    edtPhone.setText(firebaseAuth.currentUser!!.phoneNumber)
+        if(FirebaseAuth.getInstance().currentUser!!.phoneNumber != null &&
+                !TextUtils.isDigitsOnly(firebaseAuth.currentUser!!.phoneNumber)) {
+            edtPhone.setText(firebaseAuth.currentUser!!.phoneNumber)
+        }
 
         //Set view
         builder.setView(itemView)
@@ -140,15 +139,17 @@ class SplashScreenActivity : AppCompatActivity() {
                 model.phone = edtPhone.text.toString().trim()
                 model.rating = 0.0
 
-                driverInfoReference.child(firebaseAuth.currentUser!!.uid)
+                driverInfoRef.child(FirebaseAuth.getInstance().currentUser!!.uid)
                     .setValue(model)
                     .addOnFailureListener {
                         Toast.makeText(applicationContext, ""+it.message, Toast.LENGTH_SHORT).show()
+                        Log.d("__register",""+it.message)
                         dialog.dismiss()
                         progressBar.visibility = View.GONE
                     }
                     .addOnSuccessListener{
-                        Toast.makeText(applicationContext, "Registerd Successfully!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "Registered Successfully!", Toast.LENGTH_SHORT).show()
+                        Log.d("__register",""+it)
                         dialog.dismiss()
                         progressBar.visibility = View.GONE
                     }
