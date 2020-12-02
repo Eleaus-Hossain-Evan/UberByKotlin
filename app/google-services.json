@@ -15,6 +15,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "584230879351-q7vg33vum0o018nensub02n3lv5ls90f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.uberbykotlin",
+            "certificate_hash": "b70fa935250697b37f5204fd929954d87bb44d93"
+          }
+        },
+        {
           "client_id": "584230879351-ibm0du9su8mni86ppbr16nm48jnsa1f2.apps.googleusercontent.com",
           "client_type": 3
         }
