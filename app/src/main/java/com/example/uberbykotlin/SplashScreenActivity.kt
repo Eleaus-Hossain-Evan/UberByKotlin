@@ -2,8 +2,7 @@ package com.example.uberbykotlin
 
 import android.app.Activity
 import android.content.Intent
-import android.icu.lang.UCharacter.isDigit
-import androidx.appcompat.app.AppCompatActivity
+import android.net.Uri
 import android.os.Bundle
 import android.text.TextUtils
 import android.util.Log
@@ -11,19 +10,26 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.AlertDialogLayout
+import androidx.appcompat.app.AppCompatActivity
 import com.example.uberbykotlin.model.DriverInfoModel
 import com.firebase.ui.auth.AuthMethodPickerLayout
 import com.firebase.ui.auth.AuthUI
 import com.firebase.ui.auth.IdpResponse
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.material.internal.ContextUtils.getActivity
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.*
 import io.reactivex.Completable
 import kotlinx.android.synthetic.main.activity_splash_screen.*
-import java.lang.Character.isDigit
+import kotlinx.android.synthetic.main.layout_register.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.util.*
 import java.util.concurrent.TimeUnit
+
 
 class SplashScreenActivity : AppCompatActivity() {
 
@@ -37,6 +43,7 @@ class SplashScreenActivity : AppCompatActivity() {
     private lateinit var listener: FirebaseAuth.AuthStateListener
     private lateinit var database: FirebaseDatabase
     private lateinit var driverInfoRef: DatabaseReference
+    private lateinit var user: FirebaseUser
 
     override fun onStart() {
         super.onStart()
@@ -62,20 +69,22 @@ class SplashScreenActivity : AppCompatActivity() {
         setContentView(R.layout.activity_splash_screen)
 
         init()
+
     }
 
     private fun init() {
         firebaseAuth = FirebaseAuth.getInstance()
+
         database = FirebaseDatabase.getInstance()
         driverInfoRef = database.getReference(Common.DRIVER_INFO_REFERENCE)
 
-        this.providers = Arrays.asList(
+        providers = Arrays.asList(
             AuthUI.IdpConfig.PhoneBuilder().build(),
             AuthUI.IdpConfig.GoogleBuilder().build()
         )
 
-        listener = FirebaseAuth.AuthStateListener {
-            val user = it.currentUser
+        listener = FirebaseAuth.AuthStateListener { myFirebaseAuth->
+            user = myFirebaseAuth.currentUser!!
             if (user != null){
                 checkUserFromFirebase()
             }
@@ -86,23 +95,38 @@ class SplashScreenActivity : AppCompatActivity() {
     }
 
     private fun checkUserFromFirebase() {
-        driverInfoRef
-            .child(FirebaseAuth.getInstance().currentUser!!.uid)
+        FirebaseDatabase.getInstance().reference
+            .child("DriverInfo")
+            .child(user.uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     if (snapshot.exists()) {
-                        Toast.makeText(applicationContext, "User already registered!", Toast.LENGTH_SHORT).show()
+                        if (snapshot.exists()) {
+                            Toast.makeText(
+                                applicationContext,
+                                "User already registered!",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            Log.d("User-Registered", "user allready registerd"+ user.uid)
+                        } else {
+                            showRegisterLayput()
+                        }
                     }
                 }
+
                 override fun onCancelled(error: DatabaseError) {
-                    showRegisterLayput()
+                    Toast.makeText(applicationContext, "" + error.message, Toast.LENGTH_LONG)
+                        .show()
                 }
             })
     }
 
     private fun showRegisterLayput() {
-        val builder = AlertDialog.Builder(applicationContext,R.style.DialogTheme)
-        val itemView = LayoutInflater.from(applicationContext).inflate(R.layout.layout_register, null)
+        val builder = AlertDialog.Builder(applicationContext, R.style.DialogTheme)
+        val itemView = LayoutInflater.from(applicationContext).inflate(
+            R.layout.layout_register,
+            null
+        )
 
         val edtFirstName = itemView.findViewById<View>(R.id.edtFirstName) as TextInputEditText
         val edtLastName = itemView.findViewById<View>(R.id.edtLastName) as TextInputEditText
@@ -142,16 +166,21 @@ class SplashScreenActivity : AppCompatActivity() {
                 driverInfoRef.child(FirebaseAuth.getInstance().currentUser!!.uid)
                     .setValue(model)
                     .addOnFailureListener {
-                        Toast.makeText(applicationContext, ""+it.message, Toast.LENGTH_SHORT).show()
-                        Log.d("__register",""+it.message)
+                        Toast.makeText(applicationContext, "" + it.message, Toast.LENGTH_SHORT).show()
+                        Log.d("__register", "" + it.message)
                         dialog.dismiss()
                         progressBar.visibility = View.GONE
                     }
                     .addOnSuccessListener{
-                        Toast.makeText(applicationContext, "Registered Successfully!", Toast.LENGTH_SHORT).show()
-                        Log.d("__register",""+it)
+                        Toast.makeText(
+                            applicationContext,
+                            "Registered Successfully!",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        Log.d("__register", "" + it)
                         dialog.dismiss()
                         progressBar.visibility = View.GONE
+                        showLoginLayout()
                     }
             }
         }
@@ -159,6 +188,7 @@ class SplashScreenActivity : AppCompatActivity() {
     }
 
     private fun showLoginLayout() {
+        progressBar.visibility = View.GONE
         val authMethodPickerLayout = AuthMethodPickerLayout.Builder(R.layout.layout_sign_in)
             .setPhoneButtonId(R.id.btnPhoneSignIn)
             .setGoogleButtonId(R.id.btnGoogleSignIn)
@@ -170,8 +200,7 @@ class SplashScreenActivity : AppCompatActivity() {
                 .setTheme(R.style.LoginTheme)
                 .setAvailableProviders(providers)
                 .setIsSmartLockEnabled(false)
-                .build()
-        , LOGIN_REQUEST_CODE
+                .build(), LOGIN_REQUEST_CODE
         )
     }
 
@@ -180,10 +209,38 @@ class SplashScreenActivity : AppCompatActivity() {
         if (requestCode == LOGIN_REQUEST_CODE){
             val response = IdpResponse.fromResultIntent(data)
             if(resultCode == Activity.RESULT_OK){
-                val user = FirebaseAuth.getInstance().currentUser
+                user = FirebaseAuth.getInstance().currentUser!!
+                Log.d("FirebaseAuth-User", "user: $user")
+                Log.d("FirebaseAuth-User", "uid: " + user!!.uid)
+                Log.d("FirebaseAuth-User", "response: $response")
+                Log.d("FirebaseAuth-User", "responseStr: " + response.toString().get(1))
+                Log.d("FirebaseAuth-User", "responseStr: ")
+
+//                val acct = GoogleSignIn.getLastSignedInAccount(applicationContext)
+//                if (acct != null) {
+//                    val personName = acct.displayName
+//                    val personGivenName = acct.givenName
+//                    val personFamilyName = acct.familyName
+//                    val personEmail = acct.email
+//                    val personId = acct.id
+//                    val personPhoto: Uri? = acct.photoUrl
+//                    Log.d("FirebaseAuth-User", "responseStr: $personName")
+//                    Log.d("FirebaseAuth-User", "responseStr: $personGivenName")
+//                    Log.d("FirebaseAuth-User", "responseStr: $personFamilyName")
+//                    Log.d("FirebaseAuth-User", "responseStr: $personEmail")
+//                    Log.d("FirebaseAuth-User", "responseStr: $personId")
+//                    Log.d("FirebaseAuth-User", "responseStr: $personPhoto")
+//                    val model = DriverInfoModel()
+//                    model.firstName = personGivenName.toString()
+//                    model.lastName = personFamilyName.toString()
+//                    model.email = personEmail.toString()
+//                    model.phone = ""
+//                    model.rating = 0.0
+//                    FirebaseDatabase.getInstance().getReference("DriverInfo").child(user.uid).setValue(model)
+//                }
             }else{
-                Toast.makeText(this, ""+response!!.error!!.message, Toast.LENGTH_SHORT).show()
-                Log.d("SignIn Error",""+ response.error!!.message)
+                Toast.makeText(this, "" + response!!.error!!.message, Toast.LENGTH_SHORT).show()
+                Log.d("SignIn Error", "" + response.error!!.message)
             }
         }
     }
