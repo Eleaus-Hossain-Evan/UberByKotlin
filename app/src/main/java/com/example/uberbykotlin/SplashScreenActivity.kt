@@ -64,11 +64,8 @@ class SplashScreenActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_splash_screen)
-
         init()
-
     }
-
     private fun init() {
         context1 = this.window.context
         firebaseAuth = FirebaseAuth.getInstance()
