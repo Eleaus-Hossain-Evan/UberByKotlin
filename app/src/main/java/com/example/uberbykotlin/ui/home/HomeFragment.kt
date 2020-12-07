@@ -3,6 +3,7 @@ package com.example.uberbykotlin.ui.home
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.res.Resources
+import android.location.Location
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
@@ -16,7 +17,10 @@ import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
+import com.example.uberbykotlin.Common
 import com.example.uberbykotlin.R
+import com.firebase.geofire.GeoFire
+import com.firebase.geofire.GeoLocation
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -25,6 +29,10 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.tasks.Task
+import com.google.android.material.snackbar.Snackbar
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.*
 import com.karumi.dexter.Dexter
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionDeniedResponse
@@ -42,11 +50,42 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     //Location
     private lateinit var locationRequest: LocationRequest
     private lateinit var locationCallback: LocationCallback
-    private lateinit var fusedLocationProviderClint: FusedLocationProviderClient
+    private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+    private lateinit var userLatLng: LatLng
+
+    //Online system
+    private lateinit var onlineRef: DatabaseReference
+    private lateinit var currentUserRef: DatabaseReference
+    private lateinit var driversLocationRef: DatabaseReference
+    private lateinit var geoFire: GeoFire
+
+    private var onlineValueEventListener = object: ValueEventListener{
+        override fun onCancelled(error: DatabaseError) {
+            Snackbar.make(mapFragment.requireView(), error.message, Snackbar.LENGTH_LONG).show()
+
+        }
+        override fun onDataChange(snapshot: DataSnapshot) {
+            if (snapshot.exists()){
+                currentUserRef.onDisconnect().removeValue()
+            }
+        }
+
+    }
 
     override fun onDestroy() {
-        fusedLocationProviderClint.removeLocationUpdates(locationCallback)
+        fusedLocationProviderClient.removeLocationUpdates(locationCallback)
+        geoFire.removeLocation(FirebaseAuth.getInstance().currentUser!!.uid)
+        onlineRef.removeEventListener(onlineValueEventListener)
         super.onDestroy()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        registerOnlineSystem()
+    }
+
+    private fun registerOnlineSystem() {
+        onlineRef.addValueEventListener(onlineValueEventListener)
     }
 
     override fun onCreateView(
@@ -66,22 +105,23 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun init() {
+
+        onlineRef = FirebaseDatabase.getInstance().reference.child(".info/connected")
+        driversLocationRef =
+            FirebaseDatabase.getInstance().getReference(Common.DRIVERS_LOCATION_REFERENCE)
+        currentUserRef =
+            FirebaseDatabase.getInstance().getReference(Common.DRIVERS_LOCATION_REFERENCE).child(
+                FirebaseAuth.getInstance().currentUser!!.uid
+            )
+
+        geoFire = GeoFire(driversLocationRef)
+        registerOnlineSystem()
+
         locationRequest = LocationRequest()
         locationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
         locationRequest.fastestInterval = 3000
         locationRequest.interval = 5000
         locationRequest.smallestDisplacement = 10f
-
-        locationCallback = object : LocationCallback(){
-            override fun onLocationResult(locationResult: LocationResult?) {
-                super.onLocationResult(locationResult)
-
-                val newPos = LatLng(locationResult!!.lastLocation.latitude, locationResult!!.lastLocation.longitude)
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(newPos,18f))
-            }
-        }
-
-        fusedLocationProviderClint = LocationServices.getFusedLocationProviderClient(requireContext())
 
         if (ActivityCompat.checkSelfPermission(
                 requireContext(),
@@ -90,8 +130,54 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                 requireContext(),
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
-        ) { }
-        fusedLocationProviderClint.requestLocationUpdates(locationRequest,locationCallback, Looper.myLooper())
+        ) {
+        }
+        fusedLocationProviderClient =
+            LocationServices.getFusedLocationProviderClient(requireContext())
+        var lastKnownLocation: Location ?= null
+        //////////////////////////////////////////////////
+        val locationResult = fusedLocationProviderClient.lastLocation
+        locationResult.addOnCompleteListener(requireActivity()) {
+            if (it.isSuccessful) {
+                // Set the map's camera position to the current location of the device.
+                if (it.result != null) {
+                    lastKnownLocation = it.result
+                }
+            } else {
+                Log.d("User Location", "Current location is null. Using defaults.")
+                Log.e("User Location", "Exception: %s", it.exception)
+            }
+        }
+        /////////////////////////////////////////////////
+        locationCallback = object : LocationCallback(){
+            override fun onLocationResult(locationResult: LocationResult) {
+                super.onLocationResult(locationResult)
+
+
+                var newPos = LatLng(locationResult!!.lastLocation.latitude, locationResult!!.lastLocation.longitude)
+                if(newPos==null){
+                    newPos = LatLng(lastKnownLocation!!.latitude,lastKnownLocation!!.longitude)
+                }
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(newPos,18f))
+
+                //Update Location
+                geoFire.setLocation(
+                    FirebaseAuth.getInstance().currentUser!!.uid,
+                    GeoLocation(newPos.latitude,newPos.longitude)
+                ){key:String? , error: DatabaseError->
+                    if(error != null){
+                        Snackbar.make(mapFragment.requireView(), error.message, Snackbar.LENGTH_LONG).show()
+                    }else{
+                        Snackbar.make(mapFragment.requireView(), "Your're Online!", Snackbar.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            override fun onLocationAvailability(p0: LocationAvailability?) {
+                super.onLocationAvailability(p0)
+            }
+        }
+        fusedLocationProviderClient.requestLocationUpdates(locationRequest,locationCallback, Looper.myLooper())
     }
 
     override fun onMapReady(googleMap: GoogleMap?) {
@@ -108,12 +194,12 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                     mMap.setOnMyLocationClickListener {
 
                         Toast.makeText(context!!, "Button Clicked", Toast.LENGTH_SHORT).show()
-                        fusedLocationProviderClint.lastLocation
+                        fusedLocationProviderClient.lastLocation
                             .addOnFailureListener {
                                 Toast.makeText(context!!, "${it.message}", Toast.LENGTH_SHORT)
                                     .show()
                             }.addOnSuccessListener {
-                                val userLatLng = LatLng(it.latitude, it.longitude)
+                                userLatLng = LatLng(it.latitude, it.longitude)
                                 mMap.animateCamera(
                                     CameraUpdateFactory.newLatLngZoom(
                                         userLatLng,
