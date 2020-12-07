@@ -22,7 +22,8 @@
             android:backgroundTint="@android:color/white"
             android:drawableStart="@drawable/ic_baseline_phone_24"
             android:text="@string/sign_in_with_phone"
-            android:textColor="@android:color/black"/>
+            android:textColor="@android:color/black"
+            android:drawableTint="@color/black"/>
         <Button
             android:id="@+id/btnGoogleSignIn"
             android:layout_width="match_parent"
@@ -31,7 +32,8 @@
             android:backgroundTint="@android:color/white"
             android:drawableStart="@drawable/fui_ic_googleg_color_24dp"
             android:text="@string/sign_in_with_google"
-            android:textColor="@android:color/black"/>
+            android:textColor="@android:color/black"
+            android:drawableTint="@color/black"/>
     </LinearLayout>
 
 </RelativeLayout>

@@ -12,6 +12,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.example.uberbykotlin.Common.currentUser
 import com.example.uberbykotlin.model.DriverInfoModel
 import com.firebase.ui.auth.AuthMethodPickerLayout
 import com.firebase.ui.auth.AuthUI
@@ -19,6 +20,7 @@ import com.firebase.ui.auth.IdpResponse
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuth.getInstance
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.*
 import io.reactivex.Completable
@@ -34,7 +36,6 @@ class SplashScreenActivity : AppCompatActivity() {
         private val LOGIN_REQUEST_CODE = 7171
     }
 
-    private lateinit var context1: Context
     private lateinit var providers: List<AuthUI.IdpConfig>
     private lateinit var firebaseAuth: FirebaseAuth
     private lateinit var listener: FirebaseAuth.AuthStateListener
@@ -67,8 +68,8 @@ class SplashScreenActivity : AppCompatActivity() {
         init()
     }
     private fun init() {
-        context1 = this.window.context
         firebaseAuth = FirebaseAuth.getInstance()
+
 
         database = FirebaseDatabase.getInstance()
         driverInfoRef = database.getReference(Common.DRIVER_INFO_REFERENCE)
@@ -77,6 +78,7 @@ class SplashScreenActivity : AppCompatActivity() {
             AuthUI.IdpConfig.PhoneBuilder().build(),
             AuthUI.IdpConfig.GoogleBuilder().build()
         )
+
 
         listener = FirebaseAuth.AuthStateListener { myFirebaseAuth ->
             user = myFirebaseAuth.currentUser!!
@@ -89,20 +91,21 @@ class SplashScreenActivity : AppCompatActivity() {
     }
 
     private fun checkUserFromFirebase() {
-        val rootRef = FirebaseDatabase.getInstance().reference
-        val userNameRef = rootRef.child(Common.DRIVER_INFO_REFERENCE)
-        val queries = userNameRef.orderByChild("uid").equalTo(user.uid)
-        val eventListener: ValueEventListener = object : ValueEventListener {
+//        val rootRef = FirebaseDatabase.getInstance().reference
+//        val userNameRef = rootRef.child(Common.DRIVER_INFO_REFERENCE)
+//        val queries = userNameRef.orderByChild("uid").equalTo(user.uid)
+        driverInfoRef
+            .child(user.uid)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(dataSnapshot: DataSnapshot) {
-                if (!dataSnapshot.exists()) {
-                    showRegisterLayout()
-                } else {
-                    Toast.makeText(
-                        applicationContext,
-                        "User already registered!",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                if (dataSnapshot.exists()) {
+//                    Toast.makeText(applicationContext, "User already registered!", Toast.LENGTH_SHORT).show()
                     Log.d("User-Registered", "user already registered" + user.uid)
+                    val model = dataSnapshot.getValue(DriverInfoModel::class.java)
+                    Log.i("checking", "-----------------showRegisterLayout: starting new activity")
+                    goToHomeActivity(model)
+                } else {
+                    showRegisterLayout()
                 }
             }
 
@@ -114,8 +117,15 @@ class SplashScreenActivity : AppCompatActivity() {
                 )
                     .show()
             }
-        }
-        queries.addListenerForSingleValueEvent(eventListener)
+        })
+//        val eventListener: ValueEventListener = object : ValueEventListener
+//        queries.addListenerForSingleValueEvent(eventListener)
+    }
+
+    private fun goToHomeActivity(model: DriverInfoModel?) {
+        Common.currentUser = model
+        startActivity(Intent(this,DriverHomeActivity::class.java))
+        finish()
     }
 
     private fun showRegisterLayout() {
@@ -168,26 +178,20 @@ class SplashScreenActivity : AppCompatActivity() {
                 driverInfoRef.child(FirebaseAuth.getInstance().currentUser!!.uid)
                     .setValue(model)
                     .addOnFailureListener {
-                        Toast.makeText(
-                            applicationContext,
-                            "" + it.message,
-                            Toast.LENGTH_SHORT
-                        )
-                            .show()
+                        Toast.makeText(applicationContext, "" + it.message, Toast.LENGTH_SHORT).show()
                         Log.d("__register", "" + it.message)
                         dialog.dismiss()
                         progressBar.visibility = View.GONE
                     }
                     .addOnSuccessListener {
-                        Toast.makeText(
-                            applicationContext,
-                            "Registered Successfully!",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(applicationContext, "Registered Successfully!", Toast.LENGTH_SHORT).show()
                         Log.d("__register", "" + it)
+                        Log.i("checking", "-----------------showRegisterLayout: dialog screen dismissed")
                         dialog.dismiss()
+                        Log.i("checking", "-----------------showRegisterLayout: starting new activity")
+                        goToHomeActivity(model)
+
                         progressBar.visibility = View.GONE
-                        showLoginLayout()
                     }
             }
         }
@@ -220,34 +224,11 @@ class SplashScreenActivity : AppCompatActivity() {
             val response = IdpResponse.fromResultIntent(data)
             if (resultCode == Activity.RESULT_OK) {
                 user = FirebaseAuth.getInstance().currentUser!!
-                Log.d("FirebaseAuth-User", "user: $user")
-                Log.d("FirebaseAuth-User", "uid: " + user.uid)
-                Log.d("FirebaseAuth-User", "response: $response")
-                Log.d("FirebaseAuth-User", "responseStr: " + response.toString().get(1))
-                Log.d("FirebaseAuth-User", "responseStr: ")
-
-//                val acct = GoogleSignIn.getLastSignedInAccount(applicationContext)
-//                if (acct != null) {
-//                    val personName = acct.displayName
-//                    val personGivenName = acct.givenName
-//                    val personFamilyName = acct.familyName
-//                    val personEmail = acct.email
-//                    val personId = acct.id
-//                    val personPhoto: Uri? = acct.photoUrl
-//                    Log.d("FirebaseAuth-User", "responseStr: $personName")
-//                    Log.d("FirebaseAuth-User", "responseStr: $personGivenName")
-//                    Log.d("FirebaseAuth-User", "responseStr: $personFamilyName")
-//                    Log.d("FirebaseAuth-User", "responseStr: $personEmail")
-//                    Log.d("FirebaseAuth-User", "responseStr: $personId")
-//                    Log.d("FirebaseAuth-User", "responseStr: $personPhoto")
-//                    val model = DriverInfoModel()
-//                    model.firstName = personGivenName.toString()
-//                    model.lastName = personFamilyName.toString()
-//                    model.email = personEmail.toString()
-//                    model.phone = ""
-//                    model.rating = 0.0
-//                    FirebaseDatabase.getInstance().getReference("DriverInfo").child(user.uid).setValue(model)
-//                }
+                Log.i("FirebaseAuth-User", "user: $user")
+                Log.i("FirebaseAuth-User", "uid: " + user.uid)
+                Log.i("FirebaseAuth-User", "response: $response")
+                Log.i("FirebaseAuth-User", "responseStr: " + response.toString().get(1))
+                Log.i("FirebaseAuth-User", "responseStr: ")
             } else {
                 Toast.makeText(this, "" + response!!.error!!.message, Toast.LENGTH_SHORT).show()
                 Log.d("SignIn Error", "" + response.error!!.message)
