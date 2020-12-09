@@ -21,6 +21,8 @@ import com.google.android.gms.maps.model.MarkerOptions
 
 class HomeFragment : Fragment(), OnMapReadyCallback {
 
+    private val TAG = "checking"
+
     private lateinit var mMap: GoogleMap
     private lateinit var homeViewModel: HomeViewModel
 
@@ -39,8 +41,9 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         return root
     }
 
-    override fun onMapReady(googleMap: GoogleMap?) {
-        mMap = googleMap!!
+    override fun onMapReady(googleMap: GoogleMap) {
+        Log.i(TAG, "--------------------onMapReady: inside")
+        mMap = googleMap
 
         mMap.uiSettings.isZoomControlsEnabled = true
 
